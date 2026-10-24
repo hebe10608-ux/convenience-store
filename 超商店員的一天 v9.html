@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>超商店員的一天 v9</title>
+<style>
+body{margin:0;background:#16322f;color:#fff;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;display:flex;justify-content:center}
+#wrap{width:100%;max-width:660px;padding:8px}
+.hud{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;font-weight:700;font-size:14px}
+.hud span{background:#0f8a5f;padding:5px 10px;border-radius:6px}
+.hud span:empty{display:none}
+#where{background:#2d5c55}
+#money{background:#ffd23f;color:#16322f}
+#rush{background:#e5484d}
+#comp{background:#b8442e}
+#stam{display:inline-block;width:70px;height:8px;background:#0a3a30;border-radius:4px;vertical-align:middle;overflow:hidden}
+#bar{display:block;height:100%;width:100%;background:#ffd23f}
+canvas{width:100%;height:auto;display:block;border-radius:8px}
+#msg{min-height:22px;margin:6px 0 2px;font-size:14px}
+#hint{min-height:20px;font-size:13px;color:#ffd23f;font-weight:700}
+.help{font-size:12px;opacity:.85;line-height:1.7}
+.overlay{position:fixed;inset:0;background:rgba(22,50,47,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+.overlay[hidden]{display:none}
+.card{background:#fff;color:#16322f;padding:22px;border-radius:10px;max-width:420px;width:100%;line-height:1.6}
+.card h3{margin:0 0 6px;font-size:22px;text-align:center}
+.card h4{margin:14px 0 6px;font-size:14px}
+.opts{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.opts.three{grid-template-columns:repeat(3,1fr)}
+.opt{padding:10px 6px;border:2px solid #b9c8c4;background:#fff;color:#16322f;border-radius:8px;font:inherit;font-weight:700;cursor:pointer}
+.opt.on{border-color:#0f8a5f;background:#e3f4ec}
+.desc{font-size:13px;min-height:62px;margin:6px 0 0;opacity:.9}
+.go{width:100%;margin-top:12px;padding:12px;border:0;border-radius:8px;background:#0f8a5f;color:#fff;font:inherit;font-size:17px;font-weight:700;cursor:pointer}
+.ghost{padding:8px 14px;border:2px solid #0f8a5f;background:#fff;color:#0f8a5f;border-radius:6px;cursor:pointer;font:inherit;margin:4px 4px 0 0}
+#end .card{text-align:center}
+#report{text-align:left;font-size:12px;background:#eef3f1;padding:8px;border-radius:6px;white-space:pre-wrap;margin:0 0 8px}
+
+html{-webkit-text-size-adjust:100%}
+body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#wrap{max-width:960px;box-sizing:border-box}
+canvas{touch-action:manipulation;-webkit-user-select:none;user-select:none;margin:0 auto;max-width:100%}
+@media (min-width:700px) and (min-height:600px){canvas{max-width:max(480px,calc((100vh - 190px) * 4 / 3));max-width:max(480px,calc((100dvh - 190px) * 4 / 3))}}
+@media (min-width:700px){.hud{font-size:16px;gap:8px}.hud span{padding:6px 12px}#msg{font-size:16px}#hint{font-size:15px}.help{font-size:14px}}
+@media (max-width:480px){
+  #wrap{padding:6px}
+  .hud{font-size:12px;gap:4px}.hud span{padding:4px 7px;border-radius:5px}
+  #stam{width:48px}
+  #msg{font-size:13px}.help{font-size:11.5px;line-height:1.6}
+  .overlay{padding:10px;align-items:flex-start}
+  .card{padding:16px;max-width:none}.card h3{font-size:20px}
+  .opt{padding:10px 4px;font-size:14px}.desc{font-size:12.5px;min-height:0}
+  .go{font-size:16px;padding:14px}.ghost{padding:10px 12px;margin:4px 4px 0 0}
+}
+@media (max-height:480px) and (orientation:landscape){.overlay{align-items:flex-start}.card{max-width:560px}.desc{min-height:0}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="hud">
+    <span id="where"></span><span id="time"></span><span id="money"></span><span id="rep"></span><span id="comp"></span>
+    <span>體力 <b id="stam"><i id="bar"></i></b></span><span id="carry"></span><span id="rush"></span>
+  </div>
+  <canvas id="cv" width="1280" height="960"></canvas>
+  <div id="msg"></div>
+  <div id="hint"></div>
+  <div class="help">
+    滑鼠／手機／平板：點地板就走過去；點收銀、咖啡機、貨架、倉庫、休息區或髒污，店員會自己走過去並操作。（也可用方向鍵／WASD 走動，E 或空白鍵互動）<br>
+    客人會先逛貨架（頭上是想拿的商品），再到櫃檯排隊。櫃檯後：🧾收銀 ☕咖啡機 🚬香菸櫃 🛍️EC取貨，照客人頭上的順序處理。<br>
+    貨架空了 → 回櫃檯後面的員工區 📦倉庫拿貨 → 補貨。地上有髒污要清掃，頭上的倒數條跑完（約等於客人氣走的時間）就會被客訴。🍱休息區（也在員工區）吃飯只要 5 秒（= 30 分鐘），一天一次。<br>
+    人潮會依商圈和時間變化：標籤出現 🔥 就是尖峰。
+  </div>
+</div>
+
+<div id="menu" class="overlay"><div class="card">
+  <h3>超商店員的一天</h3>
+  <h4>① 選擇商圈</h4>
+  <div id="dBtns" class="opts"></div>
+  <p id="dDesc" class="desc"></p>
+  <h4>② 選擇班別</h4>
+  <div id="sBtns" class="opts three"></div>
+  <p id="sDesc" class="desc"></p>
+  <button class="go" onclick="start()">開始營業</button>
+</div></div>
+
+<div id="end" class="overlay" hidden><div class="card">
+  <h3 id="endTitle"></h3>
+  <p id="endText"></p>
+  <pre id="report"></pre>
+  <button id="copy" class="ghost" onclick="copyReport()">複製營業報告</button>
+  <button class="ghost" onclick="start()">再玩一次（同設定）</button>
+  <button class="ghost" onclick="backToMenu()">回選單</button>
+</div></div>
+
+<script>
+// ===== 基本設定 =====
+const HOUR = 15;                  // 現實 15 秒 = 遊戲 1 小時（8 小時班約 2 分鐘）
+const MEAL_MIN = 30, MEAL_SEC = 5; // 吃飯：現實 5 秒 = 遊戲 30 分鐘
+const SHIFT_MIN = 480;            // 一個班 8 小時
+const SPEED = 175;                // 店員走路速度
+const W = 640, H = 480;
+const T = (h, m = 0) => h * 60 + m;
+
+// ===== 商圈：客人的長相、速度、耐心、買什麼、什麼時候來 =====
+// win：時間窗口（a~b 是一天中的分鐘），g = 客人間隔秒數，bu = 一次進幾位，p = 尖峰，l = 標籤；沒命中就用 def
+const DISTRICTS = {
+  school: { name: '學區', icon: '🎒',
+    desc: '客人年輕活潑、走路快、沒耐心。上學／午休／放學時「整群」湧進來，其他時間很久才來一位。愛零食、飲料、泡麵，常來取 EC，幾乎沒人買菸。',
+    faces: ['🧒', '👩‍🎓', '🧑‍🎓', '👦', '👧'], sp: [115, 145], pat: [22, 30], n: [2, 5], price: 28, coffeeV: 40, dwell: 0.35,
+    ec: 0.22, coffee: 0.08, cig: 0.02, elder: 0, wheel: 0, drunk: 0.3, dirt: 0.8,
+    favs: { '零食架': 3, '常溫飲料': 2, '泡麵架': 2, '糖果文具': 2, '冷藏飲料': 2 },
+    def: { g: [20, 30], bu: [1, 1] },
+    win: [
+      { a: T(6, 30), b: T(8),     g: [6, 9], bu: [3, 5], p: 1, l: '上學人潮' },
+      { a: T(11, 40), b: T(13, 20), g: [6, 9], bu: [3, 5], p: 1, l: '午休人潮' },
+      { a: T(15, 50), b: T(17, 30), g: [6, 9], bu: [3, 6], p: 1, l: '放學人潮' },
+      { a: T(21),     b: T(22, 30), g: [6, 9], bu: [2, 3], p: 1, l: '補習班下課' },
+      { a: T(22, 30), b: T(6),      g: [25, 40], bu: [1, 1] }
+    ] },
+  home: { name: '住宅區', icon: '🏘️',
+    desc: '長輩多，有人推輪椅。客人走得慢、很有耐心，結帳操作也比較久；人潮分散，沒有明顯的尖峰，要穩穩地一位一位服務。常來取 EC、買日用品與罐頭。',
+    faces: ['🧑', '👩', '👨', '🧒', '👩‍🦱'], sp: [75, 100], pat: [34, 44], n: [1, 3], price: 32, coffeeV: 40, dwell: 0.9,
+    ec: 0.30, coffee: 0.06, cig: 0.12, elder: 0.45, wheel: 0.08, drunk: 0.6, dirt: 1.1,
+    favs: { '日用品': 3, '罐頭調味': 3, '麵包架': 2, '鮮食': 2 },
+    def: { g: [10, 14], bu: [1, 1] },
+    win: [
+      { a: T(7),  b: T(9, 30), g: [8, 11], bu: [1, 1], l: '早晨買菜' },
+      { a: T(16), b: T(19),    g: [7, 10], bu: [1, 1], l: '傍晚採買' },
+      { a: T(22), b: T(6),     g: [22, 32], bu: [1, 1] }
+    ] },
+  highway: { name: '幹道', icon: '🛣️',
+    desc: '貨車司機、駕駛、上班族。急性子、耐心短，買得少但很貴：咖啡和香菸特別多，EC 很少。通勤、午餐、下班時車潮湧入，夜裡貨車司機穩定來。',
+    faces: ['🧔', '👨‍💼', '👷', '🧑‍🔧', '🧑‍💼'], sp: [105, 130], pat: [20, 28], n: [1, 3], price: 38, coffeeV: 55, dwell: 0.3,
+    ec: 0.05, coffee: 0.30, cig: 0.28, elder: 0, wheel: 0, drunk: 1, dirt: 1,
+    favs: { '冷藏飲料': 3, '常溫飲料': 2, '鮮食': 2, '泡麵架': 2, '零食架': 2 },
+    def: { g: [10, 14], bu: [1, 1] },
+    win: [
+      { a: T(6),  b: T(9),     g: [5, 8], bu: [1, 2], p: 1, l: '通勤車潮' },
+      { a: T(11), b: T(13, 30), g: [5, 8], bu: [1, 2], p: 1, l: '午餐車潮' },
+      { a: T(17), b: T(20),    g: [5, 8], bu: [1, 2], p: 1, l: '下班車潮' },
+      { a: T(22), b: T(5),     g: [8, 12], bu: [1, 1], l: '貨車夜行' }
+    ] },
+  scenic: { name: '風景區', icon: '⛰️',
+    desc: '觀光客愛逛、走得慢、買得多（紀念品加價）。白天遊覽車一到「一團一團」進來，早晚和夜裡幾乎沒人。冷飲、糖果、零食賣得好。',
+    faces: ['👩', '🧑', '👨', '🧒', '👩‍🦱'], sp: [75, 100], pat: [34, 44], n: [2, 4], price: 48, coffeeV: 50, dwell: 0.9,
+    ec: 0.02, coffee: 0.15, cig: 0.05, elder: 0.1, wheel: 0.02, drunk: 0.6, dirt: 0.75,
+    favs: { '冷藏飲料': 3, '糖果文具': 3, '零食架': 2, '常溫飲料': 2 },
+    def: { g: [16, 24], bu: [1, 1] },
+    win: [
+      { a: T(10), b: T(16), g: [12, 16], bu: [3, 4], p: 1, l: '遊覽車團客' },
+      { a: T(22), b: T(6),  g: [45, 70], bu: [1, 1] }
+    ] }
+};
+
+// ===== 班別：開店時的貨架、客人偏好、體力、交班加分 =====
+const SHIFTS = {
+  early: { name: '早班', icon: '🌅', start: T(6),
+    desc: '06:00–14:00｜通勤與早餐時段，咖啡、麵包、飯糰需求高。開店時貨架全滿，咖啡和麵包賣得快，要留意補貨。體力消耗較慢。',
+    stock0: 3, ec: 0, coffee: 0.12, cig: 0, favs: { '麵包架': 2.5, '鮮食': 2.5, '冷藏飲料': 1.5, '常溫飲料': 1.5 }, stam: 0.8, dirt: 1, bonus: 1, drunk: 0 },
+  late: { name: '晚班', icon: '🌆', start: T(14),
+    desc: '14:00–22:00｜放學下班人潮，晚餐鮮食和泡麵熱賣，EC 取貨變多，地板比較容易髒。交班前要把賣場整理好，交班加分 ×1.5。',
+    stock0: 5, ec: 0.08, coffee: 0, cig: 0, favs: { '鮮食': 2.5, '泡麵架': 2, '零食架': 1.5 }, stam: 1, dirt: 0.8, bonus: 1.5, drunk: 0.03 },
+  night: { name: '夜班', icon: '🌙', start: T(22),
+    desc: '22:00–06:00｜客人少、空檔多，要趁機補貨和清潔，交班加分 ×2。熬夜體力掉得很快，偶爾有醉客，離開時會留下髒污。',
+    stock0: 2, ec: 0, coffee: 0.05, cig: 0.08, favs: { '泡麵架': 2, '零食架': 1.5, '常溫飲料': 1.5, '鮮食': 1.5 }, stam: 1.3, dirt: 0.7, bonus: 2, drunk: 0.12 }
+};
+const cfg = { d: 'school', sh: 'early' };
+let D = DISTRICTS.school, SH = SHIFTS.early;
+
+// ===== 店內地圖（x, y, 寬 w, 高 h）=====
+const BAR = { x: 20, y: 118, w: 320, h: 20 };                          // 櫃檯
+const WALL = { x: 400, y: 118, w: 220, h: 10 };                        // 員工區的牆（340~400 之間是員工通道）
+const ST = {                                                           // 櫃檯後的工作站
+  pos:    { x: 50,  y: 20, w: 50, h: 34, icon: '🧾', name: '收銀',   dur: 0.5 },
+  coffee: { x: 120, y: 20, w: 50, h: 34, icon: '☕', name: '咖啡機', dur: 1.5 },
+  cig:    { x: 190, y: 20, w: 50, h: 34, icon: '🚬', name: '香菸櫃', dur: 0.5 },
+  ec:     { x: 260, y: 20, w: 50, h: 34, icon: '🛍️', name: 'EC取貨', dur: 0.8 }
+};
+const STORE = { x: 340, y: 22, w: 110, h: 48, icon: '📦', name: '倉庫' };   // 倉庫、休息區都在櫃檯後面的員工區
+const BREAK = { x: 470, y: 22, w: 140, h: 48, icon: '🍱', name: '休息區' };
+const MAX = 18;                                                        // 貨架容量（愈大愈不用常補貨）；畫面上 6 格，每格 = MAX/6 件
+const sh = (x, y, w, h, name, items, cool) => ({ x, y, w, h, name, items, cool, stock: MAX });
+const SHELF = [                                                        // 賣場：中島貨架 + 靠牆貨架 + 冷藏櫃
+  sh(90,  230, 150, 24, '零食架',   ['🍪', '🥨', '🍿', '🍫', '🍘', '🍩']),
+  sh(90,  300, 150, 24, '泡麵架',   ['🍜', '🍲', '🍜', '🥣', '🍲', '🍜']),
+  sh(90,  370, 150, 24, '日用品',   ['🧻', '🧼', '🧴', '🧻', '🧼', '🧴']),
+  sh(300, 230, 150, 24, '麵包架',   ['🍞', '🥐', '🥖', '🥯', '🍞', '🥐']),
+  sh(300, 300, 150, 24, '常溫飲料', ['🥤', '🧃', '🥛', '🍵', '🥤', '🧃']),
+  sh(300, 370, 150, 24, '糖果文具', ['🍬', '🍭', '🍡', '✏️', '📓', '🍬']),
+  sh(24,  200, 24, 200, '罐頭調味', ['🥫', '🥫', '🧂', '🥫', '🧂', '🥫']),
+  sh(596, 170, 28, 130, '冷藏飲料', ['🥛', '🧃', '🍵', '🥤', '🧃', '🥛'], true),
+  sh(596, 310, 28, 130, '鮮食',     ['🍙', '🥪', '🍙', '🥪', '🌭', '🍙'], true)
+];
+const SOLID = [BAR, ...Object.values(ST), ...SHELF, STORE, BREAK, WALL];   // 走不過去的東西
+
+const ICON = { pos: '🧾', coffee: '☕', cig: '🚬', ec: '🛍️' };
+const SLOTX = [90, 180, 270], SLOTY = 165;   // 客人在櫃檯前排隊的三個位置
+const DOOR = { x: 320, y: 458 };
+
+const $ = id => document.getElementById(id);
+const rnd = (a, b) => a + Math.random() * (b - a);
+const randInt = r => r[0] + Math.floor(Math.random() * (r[1] - r[0] + 1));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const pad = n => String(Math.floor(n)).padStart(2, '0');
+const cv = $('cv'), ctx = cv.getContext('2d');
+ctx.scale(2, 2);                              // 畫布放大兩倍讓畫面更清晰
+let s = null, last = performance.now();       // s = 遊戲狀態（還沒開始營業時是 null）
+const keys = {};
+
+// ----- 選單 -----
+function buildMenu() {
+  $('dBtns').innerHTML = Object.keys(DISTRICTS).map(k => `<button class="opt" data-k="${k}">${DISTRICTS[k].icon} ${DISTRICTS[k].name}</button>`).join('');
+  $('sBtns').innerHTML = Object.keys(SHIFTS).map(k => `<button class="opt" data-k="${k}">${SHIFTS[k].icon} ${SHIFTS[k].name}</button>`).join('');
+  $('dBtns').onclick = e => { const b = e.target.closest('button'); if (b) { cfg.d = b.dataset.k; refreshMenu(); } };
+  $('sBtns').onclick = e => { const b = e.target.closest('button'); if (b) { cfg.sh = b.dataset.k; refreshMenu(); } };
+  refreshMenu();
+}
+function refreshMenu() {
+  document.querySelectorAll('#dBtns .opt').forEach(b => b.classList.toggle('on', b.dataset.k === cfg.d));
+  document.querySelectorAll('#sBtns .opt').forEach(b => b.classList.toggle('on', b.dataset.k === cfg.sh));
+  $('dDesc').textContent = DISTRICTS[cfg.d].desc;
+  $('sDesc').textContent = SHIFTS[cfg.sh].desc;
+}
+function backToMenu() { $('end').hidden = true; $('menu').hidden = false; s = null; }
+
+function start() {
+  D = DISTRICTS[cfg.d]; SH = SHIFTS[cfg.sh];
+  SHELF.forEach(o => o.stock = MAX);
+  s = { t: 0, el: 0, pot: 0, money: 0, rep: 5, served: 0, px: 200, py: 90, vx: 0, vy: 0, dir: 1, walk: 0, stuck: 0,
+        path: [], goal: null, hover: null, mark: null, stam: 100, carry: false, ate: false, work: null,
+        cust: [], ord: 0, dirt: [], floats: [], next: 1, dirtT: 10, wasPeak: false, run: true,
+        stats: { arr: 0, patience: 0, nobuy: 0, miss: 0, dirtPen: 0, cleaned: 0, restock: 0, blocked: 0, wrong: 0, empty: 0 } };
+  $('menu').hidden = true; $('end').hidden = true; $('copy').textContent = '複製營業報告';
+  $('where').textContent = D.icon + ' ' + D.name + '・' + SH.icon + SH.name;
+  say(D.name + SH.name + '開始營業！客人逛完貨架會到櫃檯前，就回櫃檯後面服務。');
+}
+const say = t => $('msg').textContent = t;
+const float = (x, y, txt) => s.floats.push({ x, y, txt, t: 0 });
+const Q = () => s.cust.filter(c => c.state === 'wait').sort((a, b) => a.order - b.order);   // 櫃檯前排隊的客人
+
+// ----- 碰撞與距離 -----
+function hit(x, y) {                          // 店員／客人（約 16x16）是否撞到東西
+  return SOLID.some(r => x + 8 > r.x && x - 8 < r.x + r.w && y + 8 > r.y && y - 8 < r.y + r.h);
+}
+function distTo(r, px, py) {                  // 到某個方塊的距離
+  const dx = Math.max(r.x - px, 0, px - r.x - r.w), dy = Math.max(r.y - py, 0, py - r.y - r.h);
+  return Math.hypot(dx, dy);
+}
+function near() {                             // 店員身邊最近、可以互動的東西
+  let best = null, bd = 1e9;
+  const test = (rect, type, ref) => { const d = distTo(rect, s.px, s.py); if (d < 28 && d < bd) { bd = d; best = { rect, type, ref }; } };
+  Object.keys(ST).forEach(k => test(ST[k], 'st', k));
+  SHELF.forEach(o => test(o, 'shelf', o));
+  test(STORE, 'store'); test(BREAK, 'break');
+  s.dirt.forEach(d => test({ x: d.x - 10, y: d.y - 8, w: 20, h: 16 }, 'dirt', d));
+  return best;
+}
+
+// ----- 尋路：地圖切成 10px 格子，用 BFS 找路再拉直（店員和客人共用）-----
+const CS = 10, GW = W / CS, GH = H / CS;
+const WALK = [];                              // 每一格能不能站人
+for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
+  const x = i * CS + 5, y = j * CS + 5;
+  WALK.push(x >= 16 && x <= W - 16 && y >= 16 && y <= H - 16 && !hit(x, y));
+}
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+const cellXY = n => ({ x: (n % GW) * CS + 5, y: Math.floor(n / GW) * CS + 5 });
+function clear(a, b) {                        // a 到 b 走直線會不會撞到
+  const n = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4);
+  for (let k = 1; k <= n; k++) if (hit(a.x + (b.x - a.x) * k / n, a.y + (b.y - a.y) * k / n)) return false;
+  return true;
+}
+function smooth(pts, sx, sy) {                // 能直走就不要繞格子
+  const out = []; let a = { x: sx, y: sy }, i = 0;
+  while (i < pts.length) {
+    let j = pts.length - 1;
+    while (j > i && !clear(a, pts[j])) j--;
+    out.push(pts[j]); a = pts[j]; i = j + 1;
+  }
+  return out;
+}
+function findPath(isGoal, sx = s.px, sy = s.py) {   // isGoal(x, y)：這一格算不算終點
+  const si = Math.floor(sy / CS) * GW + Math.floor(sx / CS);
+  const prev = new Int16Array(GW * GH).fill(-2); prev[si] = -1;
+  const q = [si];
+  for (let h = 0; h < q.length; h++) {
+    const c = q[h], cx = c % GW, cy = Math.floor(c / GW), p = cellXY(c);
+    if (isGoal(p.x, p.y)) {
+      const pts = [];
+      for (let k = c; k !== -1; k = prev[k]) pts.push(cellXY(k));
+      pts.reverse(); pts.shift();
+      return smooth(pts, sx, sy);
+    }
+    for (const [dx, dy] of DIRS) {
+      const nx = cx + dx, ny = cy + dy;
+      if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+      const n = ny * GW + nx;
+      if (prev[n] !== -2 || !WALK[n]) continue;
+      if (dx && dy && (!WALK[cy * GW + nx] || !WALK[ny * GW + cx])) continue;   // 斜走不能切過牆角
+      prev[n] = c; q.push(n);
+    }
+  }
+  return null;
+}
+function nearestCell(x, y) {                  // 點到不能站的地方時，改走到最近的空位
+  let b = 0, bd = 1e9;
+  WALK.forEach((w, n) => { if (!w) return; const p = cellXY(n), d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; b = n; } });
+  return cellXY(b);
+}
+function routeTo(c, pt) {                     // 客人從現在的位置走到某處的路線
+  const g = nearestCell(pt.x, pt.y);
+  return findPath((x, y) => x === g.x && y === g.y, c.x, c.y) || [];
+}
+function targetAt(x, y) {                     // 滑鼠點到的是哪個東西
+  const inside = (r, m) => x >= r.x - m && x <= r.x + r.w + m && y >= r.y - m && y <= r.y + r.h + m;
+  for (const d of s.dirt) if (Math.hypot(d.x - x, d.y - y) < 18) return { rect: { x: d.x - 10, y: d.y - 8, w: 20, h: 16 }, type: 'dirt', ref: d };
+  for (const k in ST) if (inside(ST[k], 2)) return { rect: ST[k], type: 'st', ref: k };
+  for (const o of SHELF) if (inside(o, 4)) return { rect: o, type: 'shelf', ref: o };
+  if (inside(STORE, 2)) return { rect: STORE, type: 'store' };
+  if (inside(BREAK, 2)) return { rect: BREAK, type: 'break' };
+  return null;
+}
+
+// ----- 店員的動作 -----
+function startWork(label, dur, done, meal, cust) { s.work = { label, dur, t: 0, done, meal, cust }; }
+
+function act(target) {                        // 互動（按 E，或滑鼠點到東西、走到後自動執行）
+  if (!s || !s.run || s.work) return;
+  const t = target || near();
+  if (!t) return say('附近沒有可以操作的東西。');
+  if (t.type === 'st') return counterTask(t.ref);
+  if (t.type === 'shelf') {
+    if (!s.carry) return say('手上沒貨，先去倉庫拿一箱。');
+    if (t.ref.stock >= MAX) return say(t.ref.name + '已經是滿的。');
+    return startWork('補貨中…', 0.5, () => { t.ref.stock = MAX; s.carry = false; s.stats.restock++; say(t.ref.name + '補好了。'); });
+  }
+  if (t.type === 'store') { s.carry = !s.carry; return say(s.carry ? '拿了一箱貨，去補貨架吧。' : '把貨放回倉庫。'); }
+  if (t.type === 'break') {
+    if (s.ate) return say('今天已經吃過飯了。');
+    if (s.carry) return say('先把手上的貨放下。');
+    s.ate = true;
+    return startWork('用餐中…（遊戲時間 30 分鐘）', MEAL_SEC, () => { s.stam = 100; say('吃飽了，體力全滿！'); }, true);
+  }
+  if (t.type === 'dirt') startWork('清掃中…', 0.6, () => { s.dirt = s.dirt.filter(d => d !== t.ref); s.stats.cleaned++; say('地板乾淨了。'); });
+}
+
+function counterTask(k) {                     // 在櫃檯後的工作站服務客人
+  if (s.carry) { s.stats.blocked++; return say('手上有貨，先補完貨或放回倉庫。'); }
+  const c = Q()[0];
+  if (!c || !c.arrived) { s.stats.empty++; return say('櫃檯前還沒有客人。'); }
+  if (c.tasks[0] !== k) { s.stats.wrong++; return say('客人現在要的是 ' + ICON[c.tasks[0]] + '。'); }
+  startWork(ST[k].name + '…', ST[k].dur * c.slow, () => {   // 長輩、輪椅、醉客的操作比較久
+    if (c.state !== 'wait') return;           // 客人中途走了
+    c.tasks.shift();
+    if (c.tasks.length) return say('接著處理 ' + ICON[c.tasks[0]] + '。');
+    s.money += c.value; s.served++;
+    float(c.x, c.y - 40, '+$' + c.value);
+    if (s.served % 5 === 0) s.rep = Math.min(5, s.rep + 1);
+    leave(c); say('謝謝光臨！');
+  }, false, c);
+}
+
+// ----- 客人：進門 → 逛貨架（拿商品）→ 櫃檯排隊 → 離開 -----
+function standPoint(o) {                      // 客人站在貨架哪裡拿東西
+  if (o.h > o.w) return o.x > 320 ? { x: o.x - 14, y: o.y + rnd(15, o.h - 15) } : { x: o.x + o.w + 14, y: o.y + rnd(15, o.h - 15) };
+  return { x: o.x + rnd(15, o.w - 15), y: o.y + o.h + 14 };
+}
+function pickShelf() {                        // 依商圈和班別的偏好，抽一個貨架
+  const w = SHELF.map(o => (D.favs[o.name] || 1) * (SH.favs[o.name] || 1));
+  let r = Math.random() * w.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < SHELF.length; i++) { r -= w[i]; if (r <= 0) return SHELF[i]; }
+  return SHELF[0];
+}
+function spawn() {
+  if (s.cust.length >= 9) return;
+  const ec = D.ec + SH.ec, cf = D.coffee + SH.coffee, cg = D.cig + SH.cig, r = Math.random();
+  let tasks = ['pos'], value = 0, n = randInt(D.n);
+  if (r < ec) { tasks = ['ec']; value = 30; n = 0; }
+  else if (r < ec + cf) { tasks = ['coffee', 'pos']; value = D.coffeeV; }
+  else if (r < ec + cf + cg) { tasks = ['cig', 'pos']; value = 100; }
+  const picks = []; for (let i = 0; i < n; i++) picks.push(pickShelf());
+  let face = pick(D.faces), sp = rnd(D.sp[0], D.sp[1]), pat = rnd(D.pat[0], D.pat[1]), dwell = D.dwell, slow = 1, drunk = false;
+  if (Math.random() < D.elder) { face = pick(['👵', '👴', '🧓']); sp *= 0.55; slow = 1.7; pat *= 1.3; dwell *= 1.5; }
+  else if (Math.random() < D.wheel) { face = '🧑‍🦽'; sp *= 0.5; slow = 2; pat *= 1.4; dwell *= 1.5; }
+  else if (Math.random() < SH.drunk * D.drunk) { face = '🥴'; sp *= 0.6; slow = 1.5; pat *= 1.3; drunk = true; }
+  s.stats.arr++; s.pot += value + n * D.price;
+  s.cust.push({ x: DOOR.x + rnd(-25, 25), y: DOOR.y, face, state: 'shop', tasks, value, picks,
+                stop: 0, dwell: 0, dmax: dwell, goal: null, path: [], pat: 0, max: 0, patBase: pat, arrived: false, order: 0, bought: 0, slot: -1,
+                sp, slow, drunk, step: 0, gone: false });
+}
+function leave(c) {
+  if (c.drunk && Math.random() < 0.6 && s.dirt.length < 6 && !hit(c.x, c.y + 16)) s.dirt.push({ x: c.x, y: c.y + 16, age: 0, pen: false });   // 醉客留下髒污
+  c.state = 'leave'; c.arrived = false; c.path = routeTo(c, DOOR);
+}
+function walk(c, dt) {                        // 客人沿著路線走
+  if (!c.path.length) return;
+  const p = c.path[0], d = Math.hypot(p.x - c.x, p.y - c.y);
+  if (d < 4) { c.path.shift(); return; }
+  const v = Math.min(d, c.sp * dt);
+  c.x += (p.x - c.x) / d * v; c.y += (p.y - c.y) / d * v; c.step += dt * 9;
+}
+function updCust(c, dt, q) {
+  if (c.state === 'shop') {
+    if (c.stop >= c.picks.length) {                                    // 逛完了
+      if (c.picks.length && !c.bought) { leave(c); s.stats.nobuy++; s.rep--; float(c.x, c.y - 30, '缺貨！'); say('客人想買的都缺貨，空手離開了！優質服務 -1'); return; }
+      if (Q().length < 3) { c.state = 'wait'; c.order = ++s.ord; c.pat = c.max = c.patBase; c.slot = -1; }
+      else if (!c.holding) { c.holding = true; c.path = routeTo(c, { x: 360, y: 200 }); }   // 櫃檯前滿了，先到旁邊等
+      walk(c, dt);
+      return;
+    }
+    const o = c.picks[c.stop];
+    if (!c.goal) { c.goal = standPoint(o); c.path = routeTo(c, c.goal); }
+    if (c.path.length) walk(c, dt);
+    else {
+      c.dwell += dt;
+      if (c.dwell > c.dmax) {                                          // 伸手拿商品
+        if (o.stock > 0) { o.stock--; c.value += D.price; c.bought++; } else { s.stats.miss++; float(c.x, c.y - 30, o.name + '缺貨'); }
+        c.stop++; c.goal = null; c.dwell = 0;
+      }
+    }
+  } else if (c.state === 'wait') {
+    const i = q.indexOf(c);
+    if (c.slot !== i) { c.slot = i; c.path = routeTo(c, { x: SLOTX[i], y: SLOTY }); }
+    walk(c, dt);
+    c.arrived = !c.path.length && Math.hypot(SLOTX[i] - c.x, SLOTY - c.y) < 10;
+    if (c.arrived && !(s.work && s.work.cust === c)) c.pat -= dt;      // 正在服務你的客人不會生氣
+    if (c.pat <= 0) { float(c.x, c.y - 40, '氣走了＋客訴'); leave(c); s.stats.patience++; s.rep--; say('客人等太久氣走了，被客訴！優質服務 -1（客訴 ' + (s.stats.patience + s.stats.dirtPen) + '）'); }
+  } else {                                                             // 離開
+    walk(c, dt);
+    if (!c.path.length) c.gone = true;
+  }
+}
+
+// ----- 每一幀更新 -----
+const inWin = (c, a, b) => a <= b ? (c >= a && c < b) : (c >= a || c < b);
+function flow(clock) { return D.win.find(w => inWin(clock, w.a, w.b)) || D.def; }
+
+function update(dt) {
+  if (!s.run) return;
+  s.t += dt;
+  if (s.work) { s.work.t += dt; if (s.work.t >= s.work.dur) { const f = s.work.done; s.work = null; f(); } }
+  else move(dt);
+  const eating = s.work && s.work.meal;
+  if (!eating) s.stam = Math.max(0, s.stam - dt * SH.stam);
+
+  s.el += dt * (eating ? MEAL_MIN / MEAL_SEC : 60 / HOUR);              // 遊戲時間（分鐘）：吃飯時時間跳得比較快
+  const clock = (SH.start + s.el) % 1440, fl = flow(clock), peak = !!fl.p, closing = s.el >= SHIFT_MIN - 20;
+  if (peak && !s.wasPeak) { s.next = Math.min(s.next, 1); say('🔥 ' + fl.l + '來了！'); }   // 尖峰一開始，客人馬上湧進來
+  s.wasPeak = peak;
+  s.next -= dt;
+  if (s.next <= 0) {
+    if (!closing) { const k = randInt(fl.bu); for (let i = 0; i < k; i++) spawn(); }
+    s.next = rnd(fl.g[0], fl.g[1]);
+  }
+  const q = Q();
+  s.cust.forEach(c => updCust(c, dt, q));
+  s.cust = s.cust.filter(c => !c.gone);
+
+  s.dirtT -= dt;                                                       // 地板髒污
+  if (s.dirtT <= 0 && s.dirt.length < 6) {
+    for (let i = 0; i < 20; i++) { const x = rnd(40, 600), y = rnd(190, 450); if (!hit(x, y)) { s.dirt.push({ x, y, age: 0, pen: false }); break; } }
+    s.dirtT = rnd(16, 24) * D.dirt * SH.dirt;
+  }
+  s.dirt.forEach(d => { d.age += dt; if (d.age > dirtLimit() && !d.pen) { d.pen = true; s.stats.dirtPen++; s.rep--; float(d.x, d.y, '太髒了＋客訴'); say('地板髒污放太久沒清，被客訴！優質服務 -1（客訴 ' + (s.stats.patience + s.stats.dirtPen) + '）'); } });
+
+  if (s.mark) { s.mark.t += dt; if (s.mark.t > 0.6) s.mark = null; }
+  s.floats.forEach(f => f.t += dt);
+  s.floats = s.floats.filter(f => f.t < 1);
+  if (s.el >= SHIFT_MIN || s.rep <= 0) finish();
+}
+
+const MAP = { arrowleft: 'left', a: 'left', arrowright: 'right', d: 'right', arrowup: 'up', w: 'up', arrowdown: 'down', s: 'down' };
+function move(dt) {                           // 店員移動：加速、減速、沿路線走、到了自動互動
+  const kx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), ky = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+  let wx = 0, wy = 0, sp = SPEED * (s.stam < 30 ? 0.65 : 1);           // 體力低會走得慢
+  if (kx || ky) {                                                      // 按方向鍵：取消滑鼠路線
+    s.path = []; s.goal = null;
+    const l = Math.hypot(kx, ky); wx = kx / l; wy = ky / l;
+  } else if (s.path.length) {                                          // 沿著路線走
+    const p = s.path[0], d = Math.hypot(p.x - s.px, p.y - s.py);
+    if (d < 5) s.path.shift();
+    else { wx = (p.x - s.px) / d; wy = (p.y - s.py) / d; if (s.path.length === 1) sp = Math.min(sp, 30 + d * 6); }   // 快到終點先減速
+  }
+  const k = Math.min(1, dt * 10);                                      // 加速／減速的順暢度（數字越大越靈敏）
+  s.vx += (wx * sp - s.vx) * k; s.vy += (wy * sp - s.vy) * k;
+  const nx = s.px + s.vx * dt, ny = s.py + s.vy * dt;
+  if (!hit(nx, s.py)) s.px = Math.min(W - 16, Math.max(16, nx)); else s.vx = 0;
+  if (!hit(s.px, ny)) s.py = Math.min(H - 16, Math.max(16, ny)); else s.vy = 0;
+  const spd = Math.hypot(s.vx, s.vy);
+  if (spd > 8) { s.walk += dt * spd / 22; if (Math.abs(s.vx) > 6) s.dir = s.vx < 0 ? -1 : 1; }
+  if ((wx || wy) && spd < 5) { s.stuck += dt; if (s.stuck > 0.5) { s.path = []; s.goal = null; s.stuck = 0; } } else s.stuck = 0;
+  if (!s.path.length && s.goal && spd < 40) { const g = s.goal; s.goal = null; act(g); }
+}
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (MAP[k]) { keys[MAP[k]] = true; if (s) e.preventDefault(); }
+  else if ((k === 'e' || k === ' ') && !e.repeat && s) { act(); e.preventDefault(); }
+});
+addEventListener('keyup', e => { const k = MAP[e.key.toLowerCase()]; if (k) keys[k] = false; });
+
+function mousePos(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
+cv.addEventListener('mousemove', e => {
+  if (!s) return;
+  const p = mousePos(e);
+  s.hover = s.run && !s.work ? targetAt(p.x, p.y) : null;
+  cv.style.cursor = s.hover ? 'pointer' : 'default';
+});
+cv.addEventListener('mouseleave', () => { if (s) s.hover = null; });
+cv.addEventListener('click', e => {
+  if (!s || !s.run || s.work) return;
+  const p = mousePos(e), t = targetAt(p.x, p.y);
+  if (t) {                                                             // 點到東西：走過去、自動操作
+    const close = distTo(t.rect, s.px, s.py) <= 20;
+    s.goal = t;
+    s.path = close ? [] : (findPath((x, y) => distTo(t.rect, x, y) <= 20) || []);
+    if (!close && !s.path.length) { s.goal = null; say('走不過去…'); }
+  } else {                                                             // 點空地：走過去
+    const g = nearestCell(p.x, p.y);
+    s.goal = null; s.mark = { x: g.x, y: g.y, t: 0 };
+    s.path = findPath((x, y) => x === g.x && y === g.y) || [];
+  }
+});
+
+function finish() {
+  s.run = false;
+  const full = SHELF.filter(o => o.stock >= MAX).length;
+  const bonus = Math.round((full * 15 + (s.dirt.length ? 0 : 60)) * SH.bonus), total = s.money + bonus;
+  const rate = s.money / Math.max(1, s.pot);                           // 服務率：賺到的 / 所有進店客人的潛在營業額
+  $('endTitle').textContent = s.rep <= 0 ? '店長找你談話…' : rate >= 0.8 && s.rep >= 3 ? '今日最佳店員！' : rate >= 0.55 ? '表現不錯' : '還有進步空間';
+  $('endText').innerHTML = D.icon + D.name + '・' + SH.icon + SH.name + (s.rep <= 0 ? '，優質服務歸零提前下班。' : '，下班囉！') +
+    '<br>服務客人：' + s.served + ' 位｜客訴：' + (s.stats.patience + s.stats.dirtPen) + ' 件｜營業額：$' + s.money + '（服務率 ' + Math.round(rate * 100) + '%）' +
+    '<br>交班加分：$' + bonus + '（貨架補滿 ' + full + '/' + SHELF.length + '、' + (s.dirt.length ? '還有髒污' : '地板乾淨') + '，×' + SH.bonus + '）<br><b>總計 $' + total + '</b>';
+  const st = s.stats, end = (SH.start + s.el) % 1440;
+  window.reportText = '【營業報告】' + D.name + '・' + SH.name + '｜進店 ' + st.arr + ' 位｜結帳 ' + s.served + ' 位｜服務率 ' + Math.round(rate * 100) + '%\n' +
+    '客訴 ' + (st.patience + st.dirtPen) + '（等太久氣走 ' + st.patience + '）' + '｜想買的都缺貨走掉 ' + st.nobuy + '｜缺貨少買 ' + st.miss + ' 樣\n' +
+    '髒污客訴 ' + st.dirtPen + '｜清掃 ' + st.cleaned + ' 次｜補貨 ' + st.restock + ' 次｜吃飯 ' + (s.ate ? '有' : '沒有') + '\n' +
+    '櫃檯失誤：手上有貨 ' + st.blocked + ' 次、順序錯 ' + st.wrong + ' 次、沒客人 ' + st.empty + ' 次\n' +
+    '結束優質服務 ' + Math.max(0, s.rep) + '｜營業額 $' + s.money + '｜貨架補滿 ' + full + '/' + SHELF.length + '｜結束於 ' + pad(end / 60) + ':' + pad(end % 60);
+  $('report').textContent = window.reportText;
+  $('end').hidden = false;
+}
+function copyReport() {
+  const pick = () => window.getSelection().selectAllChildren($('report'));
+  try { navigator.clipboard.writeText(window.reportText).then(() => { $('copy').textContent = '已複製！'; }, pick); }
+  catch (e) { pick(); }
+}
+
+// ----- 畫面 -----
+const FONT = '"Noto Sans TC","Microsoft JhengHei",sans-serif';
+function block(r, fill, icon, name) {
+  ctx.fillStyle = fill; ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+  if (icon) { ctx.font = '18px sans-serif'; ctx.fillText(icon, r.x + r.w / 2, r.y + r.h * 0.35); }
+  ctx.font = '11px ' + FONT;
+  ctx.fillText(name, r.x + r.w / 2, icon ? r.y + r.h * 0.8 : r.y + r.h / 2);
+}
+function drawShelf(o) {                       // 貨架：6 格商品，庫存少了格子就變淡
+  const vert = o.h > o.w;
+  ctx.fillStyle = o.cool ? '#b9e0ee' : '#d9c8a0'; ctx.fillRect(o.x, o.y, o.w, o.h);
+  ctx.strokeStyle = o.stock <= 0 && Math.floor(s.t * 4) % 2 ? '#e5484d' : '#16322f'; ctx.lineWidth = 2; ctx.strokeRect(o.x, o.y, o.w, o.h);
+  ctx.font = '14px sans-serif';
+  for (let i = 0; i < 6; i++) {
+    ctx.globalAlpha = i < Math.ceil(o.stock / (MAX / 6)) ? 1 : 0.12;
+    ctx.fillText(o.items[i], vert ? o.x + o.w / 2 : o.x + o.w / 12 * (2 * i + 1), vert ? o.y + o.h / 12 * (2 * i + 1) : o.y + o.h / 2 + 1);
+  }
+  ctx.globalAlpha = 1; ctx.fillStyle = '#16322f'; ctx.font = '11px ' + FONT;
+  ctx.fillText(o.name, o.x + o.w / 2, o.y - 8);
+}
+
+function draw() {
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#e6efec'; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#d3e0dc'; ctx.lineWidth = 1;
+  for (let x = 0; x <= W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y <= H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  ctx.fillStyle = '#c5dcd5'; ctx.fillRect(20, 20, 600, 98);            // 員工區地板
+  ctx.strokeStyle = '#16322f'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, W - 6, H - 6);
+  ctx.fillStyle = '#ffd23f'; ctx.fillRect(280, H - 8, 80, 8);          // 大門
+  ctx.fillStyle = '#16322f'; ctx.font = '11px ' + FONT; ctx.fillText('大門', 320, H - 20);
+
+  block(BAR, '#16322f', '', '櫃　檯');
+  ctx.fillStyle = '#16322f'; ctx.fillRect(WALL.x, WALL.y, WALL.w, WALL.h);   // 員工區的牆
+  ctx.fillStyle = 'rgba(22,50,47,.4)'; ctx.font = '11px ' + FONT; ctx.fillText('員工區', 540, 96); ctx.fillText('員工通道', 370, 108);
+  Object.values(ST).forEach(r => block(r, '#0f8a5f', r.icon, r.name));
+  block(STORE, '#5b6f6b', STORE.icon, STORE.name);
+  block(BREAK, '#d98e2b', BREAK.icon, BREAK.name);
+  SHELF.forEach(drawShelf);
+
+  s.dirt.forEach(d => {                                                // 髒污
+    const r = d.pen ? 0 : Math.max(0, 1 - d.age / dirtLimit());          // 剩餘時間比例（和客人耐心條同一套）
+    ctx.fillStyle = r > 0 && r < 0.3 && Math.floor(s.t * 4) % 2 ? '#e5484d' : '#8a6b3e';
+    ctx.beginPath(); ctx.ellipse(d.x, d.y, 12, 7, 0, 0, 7); ctx.fill();
+    if (!d.pen) {
+      ctx.fillStyle = '#d5dfdc'; ctx.fillRect(d.x - 14, d.y - 16, 28, 4);
+      ctx.fillStyle = r < 0.3 ? '#e5484d' : '#d98e2b'; ctx.fillRect(d.x - 14, d.y - 16, 28 * r, 4);
+    }
+  });
+
+  const t = s.run ? (s.hover || near()) : null;                        // 可互動目標的黃框
+  if (t) { ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; ctx.strokeRect(t.rect.x - 3, t.rect.y - 3, t.rect.w + 6, t.rect.h + 6); }
+
+  const q = Q();
+  s.cust.forEach(c => {                                                // 客人
+    const bob = c.path.length ? -Math.abs(Math.sin(c.step)) * 2 : 0, sway = c.drunk && c.path.length ? Math.sin(s.t * 6) * 3 : 0;
+    ctx.font = '24px sans-serif'; ctx.fillText(c.face, c.x + sway, c.y + bob);
+    if (c.state === 'shop' && c.stop < c.picks.length) { ctx.font = '13px sans-serif'; ctx.fillText(c.picks[c.stop].items[0], c.x + 14, c.y - 16); }   // 想拿的商品
+    if (c.state !== 'wait' || !c.arrived) return;
+    const txt = c.tasks.map(k => ICON[k]).join(' ');
+    ctx.font = '16px sans-serif';
+    const w = ctx.measureText(txt).width + 14;
+    ctx.fillStyle = '#fff'; ctx.fillRect(c.x - w / 2, c.y - 46, w, 22);
+    if (q[0] === c) { ctx.strokeStyle = '#0f8a5f'; ctx.lineWidth = 2; ctx.strokeRect(c.x - w / 2, c.y - 46, w, 22); }
+    ctx.fillText(txt, c.x, c.y - 35);
+    const ratio = Math.max(0, c.pat / c.max);
+    ctx.fillStyle = '#d5dfdc'; ctx.fillRect(c.x - 16, c.y + 18, 32, 5);
+    ctx.fillStyle = ratio < 0.3 ? '#e5484d' : '#0f8a5f'; ctx.fillRect(c.x - 16, c.y + 18, 32 * ratio, 5);
+  });
+
+  if (s.path.length) {                                                 // 滑鼠路線（虛線）
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(15,138,95,.7)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(s.px, s.py); s.path.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke(); ctx.setLineDash([]);
+  }
+  if (s.mark) {                                                        // 點擊地面的圓圈
+    ctx.strokeStyle = '#0f8a5f'; ctx.lineWidth = 2; ctx.globalAlpha = 1 - s.mark.t / 0.6;
+    ctx.beginPath(); ctx.arc(s.mark.x, s.mark.y, 4 + s.mark.t * 18, 0, 7); ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  const moving = Math.hypot(s.vx, s.vy) > 8;                           // 店員：影子、走路彈跳與搖擺、工作時微動
+  const bob = moving ? -Math.abs(Math.sin(s.walk * Math.PI)) * 4 : 0, tilt = moving ? Math.sin(s.walk * Math.PI) * 0.1 : 0;
+  const squash = s.work ? 1 + Math.sin(s.t * 18) * 0.06 : 1;
+  ctx.fillStyle = 'rgba(22,50,47,.18)'; ctx.beginPath(); ctx.ellipse(s.px, s.py + 12, 11, 4, 0, 0, 7); ctx.fill();
+  ctx.save(); ctx.translate(s.px, s.py + bob); ctx.rotate(tilt); ctx.scale(s.dir, squash);
+  ctx.font = '26px sans-serif'; ctx.fillText('\u{1F9D1}\u200D\u{1F373}', 0, 0); ctx.restore();
+  if (s.carry) { ctx.font = '16px sans-serif'; ctx.fillText('📦', s.px + 14, s.py - 14); }
+  if (s.work) {
+    const r = s.work.t / s.work.dur;
+    ctx.fillStyle = '#16322f'; ctx.font = '11px ' + FONT; ctx.fillText(s.work.label, s.px, s.py - 30);
+    ctx.fillStyle = '#d5dfdc'; ctx.fillRect(s.px - 18, s.py - 22, 36, 5);
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(s.px - 18, s.py - 22, 36 * r, 5);
+  }
+
+  s.floats.forEach(f => {                                              // 飄起來的文字
+    ctx.globalAlpha = 1 - f.t; ctx.fillStyle = '#16322f'; ctx.font = 'bold 14px ' + FONT;
+    ctx.fillText(f.txt, f.x, f.y - f.t * 30); ctx.globalAlpha = 1;
+  });
+}
+
+const dirtLimit = () => (D.pat[0] + D.pat[1]) / 2;   // 髒污多久沒清會被客訴：約等於客人氣走的秒數
+
+function hud() {
+  const el = Math.min(s.el, SHIFT_MIN), clock = (SH.start + el) % 1440, fl = flow(clock);
+  $('time').textContent = '🕐 ' + pad(clock / 60) + ':' + pad(clock % 60);
+  $('money').textContent = '💰 $' + s.money;
+  $('comp').textContent = '📢 客訴 ' + (s.stats.patience + s.stats.dirtPen);
+  $('rep').textContent = '優質服務 ' + '⭐'.repeat(Math.max(0, s.rep));
+  $('bar').style.width = s.stam + '%';
+  $('carry').textContent = s.carry ? '📦 搬貨中' : '';
+  $('rush').textContent = s.run && fl.p ? '🔥 ' + fl.l : '';
+  const full = SHELF.filter(o => o.stock >= MAX).length;
+  $('hint').textContent = SHIFT_MIN - el <= 120 ? '⏰ 快交班了：貨架補滿 ' + full + '/' + SHELF.length + '　髒污 ' + s.dirt.length + ' 處' : '';
+}
+
+function loop(ts) {
+  const dt = Math.min(0.05, (ts - last) / 1000); last = ts;
+  if (s) { update(dt); if (s) { draw(); hud(); } }
+  requestAnimationFrame(loop);
+}
+buildMenu();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
